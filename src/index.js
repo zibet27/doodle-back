@@ -1,48 +1,48 @@
-const speechToText = require("./speechToText")
-const http = require("http")
+const app = require("express")()
+const bodyParser = require("body-parser")
+const multer = require("./multer")
 const fs = require("fs")
+const speechToText = require("./speechToText")
 
 require("dotenv").config()
 
-http.createServer((req, res) => {
+app.use(bodyParser.json())
+app.use((_, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Headers', 'origin, content-type, accept')
+    next()
+})
 
-    const resHandler = (statusCode, status, eMessage) => {
-        res.statusCode = statusCode
-        res.write(JSON.stringify({
-            status: status, message: eMessage
-        }))
-        res.end()
+app.post("/speech", multer.single("audio"), (req, res) => {
+    const audio = req.file
+
+    const resHandler = (statusCode, status, eMessage) => res.status(statusCode).json({status: status, message: eMessage})
+
+    if (!audio) {
+        return resHandler(403, "error", "Please add correct audio file")
     }
 
-    if (req.method === "POST" && req.url === "/speech") {
-        req.on("data", async (audio) => {
+    try {
+        const fileName = "audio/speech.webm"
 
-            if (!audio) {
-                return resHandler(403, "error", "Please add correct audio file")
-            }
+        fs.writeFileSync(fileName, audio.buffer)
 
-            try {
-                const fileName = "audio/speech.mp3";
-
-                if (fs.existsSync(fileName)) fs.unlinkSync(fileName);
-
-                fs.writeFileSync(fileName, Buffer.from(new Uint8Array(audio)))
-                
-                speechToText
-                .then((text) => resHandler(200, "success", text))
-                .catch((e) => resHandler(500, "error", e.message))
-
-            } catch (e) {
-                resHandler(500, "error", e.message)
-            }
-        })
-
-        req.on("error", (e) => {
-            resHandler(400, "error", e.message)
-        })
-    } else {
-        resHandler(404, "error", "Please use correct endpoint")
+        new Promise(speechToText)
+            .then(text => {
+                console.log(text)
+                resHandler(200, "success", text)
+                fs.unlinkSync(fileName)
+            })
+            .catch(e => {
+                console.log(e)
+                resHandler(500, "error", e)
+                fs.unlinkSync(fileName)
+            })
+    } catch (e) {
+        resHandler(500, "error", e.message)
     }
-}).listen(process.env.PORT || 3003, () => console.log("Server started on PORT 3003"))
+})
+
+app.listen(process.env.PORT, () => console.log("Server started on PORT 3003"))
 
 

@@ -1,11 +1,10 @@
 const SpeechToTextV1 = require("ibm-watson/speech-to-text/v1")
-const { IamAuthenticator } = require("ibm-watson/auth")
+const {IamAuthenticator} = require("ibm-watson/auth")
 const fs = require("fs")
 
 require("dotenv").config()
 
-const speechToText = new Promise((resolve, reject) => {
-
+const speechToText = (resolve, reject) => {
     const speechToText = new SpeechToTextV1({
         authenticator: new IamAuthenticator({
             apikey: process.env.IBM_API_KEY,
@@ -15,16 +14,15 @@ const speechToText = new Promise((resolve, reject) => {
 
     const params = {
         objectMode: true,
-        contentType: 'audio/mp3',
+        contentType: "audio/webm;codecs=opus",
         model: 'en-GB_BroadbandModel',
-        splitTranscriptAtPhraseEnd: true
     }
 
     // Create the stream.
-    const recognizeStream = speechToText.recognizeUsingWebSocket(params);
+    const recognizeStream = speechToText.recognizeUsingWebSocket(params)
 
     // Pipe in the audio.
-    fs.createReadStream("audio/speech.mp3").pipe(recognizeStream);
+    fs.createReadStream("audio/speech.webm").pipe(recognizeStream)
 
     recognizeStream.on("data", function (event) {
         resolve(event.results[0].alternatives[0].transcript)
@@ -33,6 +31,9 @@ const speechToText = new Promise((resolve, reject) => {
     recognizeStream.on("error", function (event) {
         if (event.message) reject(event.message)
     })
-})
+    recognizeStream.on("close", function (event) {
+        console.log("close:", event)
+    })
+}
 
 module.exports = speechToText
